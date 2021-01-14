@@ -19,7 +19,7 @@ func (iw *ItemWrap) Return() {
 }
 
 // MarkAsInvalid marks the item as invalid (eg. unusable, unstable or broken) so
-// that after it gets put back in the pool it is discarded. It will eventually
+// that after it gets put back in the pool, it is discarded. It will eventually
 // get garbage collected.
 func (iw *ItemWrap) MarkAsInvalid() {
 	iw.invalid = true

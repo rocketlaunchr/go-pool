@@ -14,7 +14,7 @@ import (
 type Options struct {
 	// Initial creates an initial number of ready-to-use items in the pool.
 	Initial int
-	// Max sets the maximum number items kept in the pool.
+	// Max sets the maximum number of items kept in the pool.
 	Max *int
 }
 

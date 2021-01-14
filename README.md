@@ -10,7 +10,7 @@
 
 # A Better sync.Pool
 
-This package is a thin wrapper over the `Pool` provided by the `sync` package.
+This package is a thin wrapper over the `Pool` provided by the `sync` package. The `Pool` is an essential package to obtain maximum performance by reducing the number of memory allocations.
 
 ## Extra Features
 
