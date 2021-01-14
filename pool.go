@@ -158,7 +158,7 @@ func (p *Pool) GetItem() *ItemWrap {
 }
 
 // ReturnItem returns an item back to the pool.
-// Usually this function is never called as the recommened
+// Usually this function is never called as the recommended
 // approach is to call either Close or MarkAsInvalid on the item.
 func (p *Pool) ReturnItem(x *ItemWrap) {
 	p.returnItem(x)
