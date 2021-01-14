@@ -90,6 +90,9 @@ type Pool struct {
 
 // SetFactory specifies a function to generate an item when GetItem is called.
 // It must not be called concurrently with calls to GetItem.
+//
+// NOTE: factory should generally only return pointer types, since a pointer can be put into the return interface
+// value without an allocation.
 func (p *Pool) SetFactory(factory func() interface{}) {
 
 	p.syncPool.New = func() interface{} {

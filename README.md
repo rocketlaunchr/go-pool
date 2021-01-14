@@ -20,3 +20,22 @@ This package is a thin wrapper over the Pool provided by the `sync` package.
 
 
 Full Documentation will be updated soon
+
+
+## Example
+
+```go
+import "github.com/rocketlaunchr/go-pool"
+
+pool := pool.New(5) // maximum of 5 items in pool
+pool.SetFactory(func() interface{} {
+	x := &X{}
+	return x
+})
+
+item := pool.GetItem()
+defer item.Close()
+
+// Use item here or mark as invalid
+item.MarkAsInvalid()
+``
