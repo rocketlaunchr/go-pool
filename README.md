@@ -8,15 +8,15 @@
 <img src="https://github.com/rocketlaunchr/go-pool/raw/master/assets/logo.png" alt="go-pool" />
 </p>
 
-# sync.Pool wrapper
+# A Better sync.Pool
 
-This package is a thin wrapper over the Pool provided by the `sync` package.
+This package is a thin wrapper over the `Pool` provided by the `sync` package.
 
 ## Extra Features
 
 - Invalidate an item from Pool (so it never gets used again)
 - Set a maximum number of items for Pool
-- Returns the number if items in the pool (idle and in-use)
+- Returns the number of items in the pool (idle and in-use)
 
 
 Full Documentation will be updated soon
