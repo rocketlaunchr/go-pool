@@ -8,7 +8,7 @@
 <img src="https://github.com/rocketlaunchr/go-pool/raw/master/assets/logo.png" alt="go-pool" />
 </p>
 
-# A Better sync.Pool
+# A Better sync.Pool  ![](https://img.shields.io/static/v1?label=%E2%9A%A0%EF%B8%8F&message=BETA&labelColor=fbcf11&color=red) 
 
 This package is a thin wrapper over the `Pool` provided by the `sync` package. The `Pool` is an essential package to obtain maximum performance by reducing the number of memory allocations.
 

@@ -16,6 +16,10 @@ type Options struct {
 	Initial int
 	// Max sets the maximum number of items kept in the pool.
 	Max *int
+	// DisableCount, when set, disables the pool's Count function.
+	// Only set this if you need a runtime Finalizer for the item returned
+	// by the factory.
+	DisableCount bool
 }
 
 // New creates a new Pool.
@@ -42,6 +46,9 @@ func New(opts ...interface{}) Pool {
 		if o.Initial > 0 {
 			pool.initial = &o.Initial
 		}
+
+		// noCount
+		pool.noCount = o.DisableCount
 
 		return pool
 	}
@@ -82,7 +89,8 @@ type Pool struct {
 	syncPool sync.Pool
 	semMax   *semaphore.Weighted
 
-	count uint32 // count keeps track of approximately how many items are in the pool
+	noCount bool
+	count   uint32 // count keeps track of approximately how many items are in the pool
 }
 
 // SetFactory specifies a function to generate an item when Borrow is called.
@@ -93,18 +101,21 @@ type Pool struct {
 func (p *Pool) SetFactory(factory func() interface{}) {
 
 	p.syncPool.New = func() interface{} {
-		defer func() { atomic.AddUint32(&p.count, 1) }()
 		newItem := factory()
-
-		runtime.SetFinalizer(newItem, func(newItem interface{}) {
-			atomic.AddUint32(&p.count, ^uint32(0)) // p.count--
-			// fmt.Printf("Factory Item [%d] has been garbage collected. (%d left)\n", i, count)
-		})
 
 		if p.semMax != nil {
 			p.semMax.Acquire(context.Background(), 1)
 		}
-		// fmt.Printf("New Factory Item [%d] created (%d in pool)\n", i, count)
+
+		if !p.noCount {
+			atomic.AddUint32(&p.count, 1) // p.count++
+			runtime.SetFinalizer(newItem, func(newItem interface{}) {
+				atomic.AddUint32(&p.count, ^uint32(0)) // p.count--
+				// fmt.Printf("Factory Item has been garbage collected. (%d left)\n", p.count)
+			})
+		}
+
+		// fmt.Printf("New Factory Item created (%d in pool)\n", p.count)
 		return newItem
 	}
 
@@ -167,5 +178,8 @@ func (p *Pool) ReturnItem(x *ItemWrap) {
 // Count returns approximately the number of items in the pool (idle and in-use).
 // If you want an accurate number, call runtime.GC() twice (not recommended).
 func (p *Pool) Count() int {
+	if p.noCount {
+		return 0
+	}
 	return int(atomic.LoadUint32(&p.count))
 }
