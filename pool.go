@@ -152,6 +152,7 @@ func (p *Pool) returnItem(x interface{}) {
 	} else {
 		p.syncPool.Put(wrap.Item)
 	}
+	wrap.Item = nil
 	itemWrapPool.Put(wrap)
 	if p.semMax != nil {
 		p.semMax.Release(1)
