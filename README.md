@@ -38,4 +38,4 @@ defer item.Close()
 
 // Use item here or mark as invalid
 item.MarkAsInvalid()
-``
+```
