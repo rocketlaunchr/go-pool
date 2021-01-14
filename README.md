@@ -1,14 +1,15 @@
 <p align="right">
   ⭐ &nbsp;&nbsp;<strong>the project to show your appreciation.</strong> :arrow_upper_right:
 </p>
+
+<p align="center">
+<img src="https://github.com/rocketlaunchr/go-pool/raw/master/assets/logo.png" alt="go-pool" />
+</p>
+
 <p align="right">
   <a href="http://godoc.org/github.com/rocketlaunchr/go-pool"><img src="http://godoc.org/github.com/rocketlaunchr/go-pool?status.svg" /></a>
   <a href="https://goreportcard.com/report/github.com/rocketlaunchr/go-pool"><img src="https://goreportcard.com/badge/github.com/rocketlaunchr/go-pool" /></a>
   <a href="https://gocover.io/github.com/rocketlaunchr/go-pool"><img src="http://gocover.io/_badge/github.com/rocketlaunchr/go-pool" /></a>
-</p>
-
-<p align="center">
-<img src="https://github.com/rocketlaunchr/go-pool/raw/master/assets/logo.png" alt="go-pool" />
 </p>
 
 # A Better sync.Pool  ![](https://img.shields.io/static/v1?label=%E2%9A%A0%EF%B8%8F&message=BETA&labelColor=fbcf11&color=red) 
