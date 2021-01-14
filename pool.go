@@ -24,15 +24,12 @@ func New(opts ...interface{}) Pool {
 	if len(opts) == 0 {
 		return Pool{}
 	}
-
+	pool := Pool{}
 	switch o := opts[0].(type) {
 	case int:
-		pool := Pool{}
 		pool.semMax = semaphore.NewWeighted(int64(o))
 		return pool
 	case Options:
-		pool := Pool{}
-
 		// max
 		if o.Max != nil {
 			if o.Initial > *o.Max {
@@ -88,8 +85,8 @@ type Pool struct {
 	count uint32 // count keeps track of approximately how many items are in the pool
 }
 
-// SetFactory specifies a function to generate an item when GetItem is called.
-// It must not be called concurrently with calls to GetItem.
+// SetFactory specifies a function to generate an item when Borrow is called.
+// It must not be called concurrently with calls to Borrow.
 //
 // NOTE: factory should generally only return pointer types, since a pointer can be put into the return interface
 // value without an allocation.
@@ -117,7 +114,7 @@ func (p *Pool) SetFactory(factory func() interface{}) {
 
 		// create new items
 		for i := 0; i < *p.initial; i++ {
-			items = append(items, p.getItem())
+			items = append(items, p.borrow())
 		}
 		// return new items
 		for j := len(items) - 1; j >= 0; j-- {
@@ -127,7 +124,7 @@ func (p *Pool) SetFactory(factory func() interface{}) {
 	}
 }
 
-func (p *Pool) getItem() interface{} {
+func (p *Pool) borrow() interface{} {
 	wrap := itemWrapPool.Get().(*ItemWrap)
 	item := p.syncPool.Get()
 
@@ -150,19 +147,19 @@ func (p *Pool) returnItem(x interface{}) {
 	itemWrapPool.Put(wrap)
 }
 
-// GetItem obtains an item from the pool.
+// Borrow obtains an item from the pool.
 // If the Max option is set, then this function
 // will block until an item is returned back into the pool.
 //
 // After the item is no longer required, you must call
-// either Close or MarkAsInvalid on the item.
-func (p *Pool) GetItem() *ItemWrap {
-	return p.getItem().(*ItemWrap)
+// Return on the item.
+func (p *Pool) Borrow() *ItemWrap {
+	return p.borrow().(*ItemWrap)
 }
 
 // ReturnItem returns an item back to the pool.
-// Usually this function is never called as the recommended
-// approach is to call either Close or MarkAsInvalid on the item.
+// Usually this function is never called, as the recommended
+// approach is to call Return on the item.
 func (p *Pool) ReturnItem(x *ItemWrap) {
 	p.returnItem(x)
 }

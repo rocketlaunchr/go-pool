@@ -13,11 +13,9 @@ type ItemWrap struct {
 	pool    *Pool
 }
 
-// Close returns the item back to the pool.
-func (iw *ItemWrap) Close() {
-	if iw.pool != nil {
-		iw.pool.returnItem(iw)
-	}
+// Return returns the item back to the pool.
+func (iw *ItemWrap) Return() {
+	iw.pool.returnItem(iw)
 }
 
 // MarkAsInvalid marks the item as invalid (eg. unusable, unstable or broken) so
@@ -25,5 +23,4 @@ func (iw *ItemWrap) Close() {
 // get garbage collected.
 func (iw *ItemWrap) MarkAsInvalid() {
 	iw.invalid = true
-	iw.pool.returnItem(iw)
 }

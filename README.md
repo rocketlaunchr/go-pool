@@ -29,14 +29,27 @@ import "github.com/rocketlaunchr/go-pool"
 
 pool := pool.New(5) // maximum of 5 items in pool
 pool.SetFactory(func() interface{} {
-	x := &X{}
-	return x
+	return &X{}
 })
 
-item := pool.GetItem()
-defer item.Close()
+item := pool.Borrow()
+defer item.Return()
 
 // Use item here or mark as invalid
 x := item.Item.(*X) // Use item here
 item.MarkAsInvalid()
 ```
+
+Other useful packages
+------------
+
+- [awesome-svelte](https://github.com/rocketlaunchr/awesome-svelte) - Resources for killing react
+- [dataframe-go](https://github.com/rocketlaunchr/dataframe-go) - Statistics and data manipulation
+- [dbq](https://github.com/rocketlaunchr/dbq) - Zero boilerplate database operations for Go
+- [electron-alert](https://github.com/rocketlaunchr/electron-alert) - SweetAlert2 for Electron Applications
+- [google-search](https://github.com/rocketlaunchr/google-search) - Scrape google search results
+- [igo](https://github.com/rocketlaunchr/igo) - A Go transpiler with cool new syntax such as fordefer (defer for for-loops)
+- [mysql-go](https://github.com/rocketlaunchr/mysql-go) - Properly cancel slow MySQL queries
+- [react](https://github.com/rocketlaunchr/react) - Build front end applications using Go
+- [remember-go](https://github.com/rocketlaunchr/remember-go) - Cache slow database queries
+- [testing-go](https://github.com/rocketlaunchr/testing-go) - Testing framework for unit testing
