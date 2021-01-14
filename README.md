@@ -37,5 +37,6 @@ item := pool.GetItem()
 defer item.Close()
 
 // Use item here or mark as invalid
+x := item.Item.(*X) // Use item here
 item.MarkAsInvalid()
 ```
