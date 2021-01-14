@@ -177,7 +177,7 @@ func (p *Pool) ReturnItem(x *ItemWrap) {
 }
 
 // Count returns approximately the number of items in the pool (idle and in-use).
-// If you want an accurate number, call runtime.GC() twice (not recommended).
+// If you want an accurate number, call runtime.GC() twice before calling Count (not recommended).
 func (p *Pool) Count() int {
 	if p.noCount {
 		return 0
