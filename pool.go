@@ -139,12 +139,12 @@ func (p *Pool) returnItem(x interface{}) {
 	if wrap.invalid {
 		wrap.invalid = false
 	} else {
-		if p.semMax != nil {
-			p.semMax.Release(1)
-		}
 		p.syncPool.Put(wrap.Item)
 	}
 	itemWrapPool.Put(wrap)
+	if p.semMax != nil {
+		p.semMax.Release(1)
+	}
 }
 
 // Borrow obtains an item from the pool.
