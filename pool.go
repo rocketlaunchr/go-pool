@@ -101,11 +101,11 @@ type Pool struct {
 func (p *Pool) SetFactory(factory func() interface{}) {
 
 	p.syncPool.New = func() interface{} {
-		newItem := factory()
-
 		if p.semMax != nil {
 			p.semMax.Acquire(context.Background(), 1)
 		}
+
+		newItem := factory()
 
 		if !p.noCount {
 			atomic.AddUint32(&p.count, 1) // p.count++
