@@ -22,9 +22,11 @@ This package is a thin wrapper over the `Pool` provided by the `sync` package. T
 - Set a maximum number of items for Pool
 - Returns the number of items in the pool (idle and in-use)
 
+## When should I use a pool?
 
-Full Documentation will be updated soon
+If you frequently allocate many objects of the same type and you want to save some memory allocation and garbage allocation overhead — @jrv
 
+[How did I improve latency by 700% using sync.Pool](https://www.akshaydeo.com/blog/2017/12/23/How-did-I-improve-latency-by-700-percent-using-syncPool)
 
 ## Example
 
