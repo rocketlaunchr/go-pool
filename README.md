@@ -18,8 +18,8 @@ This package is a **thin** wrapper over the `Pool` provided by the `sync` packag
 
 ## Extra Features
 
-- Invalidate an item from Pool (so it never gets used again)
-- Set a maximum number of items for Pool
+- Invalidate an item from the Pool (so it never gets used again)
+- Set a maximum number of items for the Pool
 - Returns the number of items in the pool (idle and in-use)
 
 ## When should I use a pool?
