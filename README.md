@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-<img src="https://github.com/rocketlaunchr/go-pool/raw/master/assets/logo.png" alt="go-pool" />
+	<img src="assets/logo.png" alt="go-pool" />
 </p>
 
 <p align="right">
@@ -59,3 +59,10 @@ Other useful packages
 - [react](https://github.com/rocketlaunchr/react) - Build front end applications using Go
 - [remember-go](https://github.com/rocketlaunchr/remember-go) - Cache slow database queries
 - [testing-go](https://github.com/rocketlaunchr/testing-go) - Testing framework for unit testing
+
+
+
+### Logo Credits
+
+1. Renee French (gopher)
+2. Samuel Jirénius (illustration)
