@@ -18,7 +18,8 @@ type Options struct {
 	Max *int
 	// DisableCount, when set, disables the pool's Count function.
 	// Only set this if you need a runtime Finalizer for the item returned
-	// by the factory.
+	// by the factory (alternatively, wrap your item in another struct, with the Finalizer
+	// added to the original item).
 	DisableCount bool
 }
 
@@ -101,10 +102,6 @@ type Pool struct {
 func (p *Pool) SetFactory(factory func() interface{}) {
 
 	p.syncPool.New = func() interface{} {
-		if p.semMax != nil {
-			p.semMax.Acquire(context.Background(), 1)
-		}
-
 		newItem := factory()
 
 		if !p.noCount {
@@ -136,6 +133,9 @@ func (p *Pool) SetFactory(factory func() interface{}) {
 }
 
 func (p *Pool) borrow() interface{} {
+	if p.semMax != nil {
+		p.semMax.Acquire(context.Background(), 1)
+	}
 	wrap := itemWrapPool.Get().(*ItemWrap)
 	item := p.syncPool.Get()
 
