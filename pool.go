@@ -12,52 +12,20 @@ import (
 
 // Options configures the Pool struct.
 type Options struct {
+
 	// Initial creates an initial number of ready-to-use items in the pool.
-	Initial int
-	// Max sets the maximum number of items kept in the pool.
-	Max *int
-	// DisableCount, when set, disables the pool's Count function.
-	// Only set this if you need a runtime Finalizer for the item returned
-	// by the factory (alternatively, wrap your item in another struct, with the Finalizer
-	// added to the original item).
-	DisableCount bool
+	Initial uint32
+
+	// Max represents the maximum number of items you can borrow.
+	Max uint32
+
+	// EnableCount, when set, enables the pool's Count function.
+	// If you set this AND you need to set your own runtime Finalizer on the item,
+	// wrap your item in another struct, with the Finalizer added to the original item.
+	EnableCount bool
 }
 
-// New creates a new Pool.
-// opts accepts either an int (representing the max) or an Options struct.
-func New(opts ...interface{}) Pool {
-	if len(opts) == 0 {
-		return Pool{}
-	}
-	pool := Pool{}
-	switch o := opts[0].(type) {
-	case int:
-		pool.semMax = semaphore.NewWeighted(int64(o))
-		return pool
-	case Options:
-		// max
-		if o.Max != nil {
-			if o.Initial > *o.Max {
-				panic("Initial must not exceed Max")
-			}
-			pool.semMax = semaphore.NewWeighted(int64(*o.Max))
-		}
-
-		// initial
-		if o.Initial > 0 {
-			pool.initial = &o.Initial
-		}
-
-		// noCount
-		pool.noCount = o.DisableCount
-
-		return pool
-	}
-
-	panic("opts must be an int or Options struct")
-}
-
-// A Pool is a set of temporary objects that may be individually saved and
+// A Pool is a set of temporary objects that may be individually stored and
 // retrieved.
 //
 // Any item stored in the Pool may be removed automatically at any time without
@@ -76,6 +44,8 @@ func New(opts ...interface{}) Pool {
 // clients of a package. Pool provides a way to amortize allocation overhead
 // across many clients.
 //
+// The Pool scales under load and shrinks when quiescent.
+//
 // On the other hand, a free list maintained as part of a short-lived object is
 // not a suitable use for a Pool, since the overhead does not amortize well in
 // that scenario. It is more efficient to have such objects implement their own
@@ -85,13 +55,48 @@ func New(opts ...interface{}) Pool {
 type Pool struct {
 	noCopy noCopy
 
-	initial *int // if nil, then initial items have already been created (or initial option was no set)
+	initial *uint32 // if nil, then initial items have already been created (or initial option was no set)
 
 	syncPool sync.Pool
 	semMax   *semaphore.Weighted
 
-	noCount bool
-	count   uint32 // count keeps track of approximately how many items are in the pool
+	enableCount      bool
+	count            uint32 // count keeps track of approximately how many items are in existence (in the pool and in-use).
+	countBorrowedOut uint32
+}
+
+// New creates a new Pool.
+// opts accepts either an int (representing the max) or an Options struct.
+func New(opts ...any) Pool {
+	if len(opts) == 0 {
+		return Pool{}
+	}
+	pool := Pool{}
+	switch o := opts[0].(type) {
+	case int:
+		pool.semMax = semaphore.NewWeighted(int64(o))
+	case uint32:
+		pool.semMax = semaphore.NewWeighted(int64(o))
+	case Options:
+		// max
+		if o.Max != 0 {
+			if o.Initial > o.Max {
+				panic("Initial must not exceed Max")
+			}
+			pool.semMax = semaphore.NewWeighted(int64(o.Max))
+		}
+
+		// initial
+		if o.Initial > 0 {
+			pool.initial = &o.Initial
+		}
+
+		// enableCount
+		pool.enableCount = o.EnableCount
+	default:
+		panic("opts must be an int or Options struct")
+	}
+	return pool
 }
 
 // SetFactory specifies a function to generate an item when Borrow is called.
@@ -99,29 +104,29 @@ type Pool struct {
 //
 // NOTE: factory should generally only return pointer types, since a pointer can be put into the return interface
 // value without an allocation.
-func (p *Pool) SetFactory(factory func() interface{}) {
+func (p *Pool) SetFactory(factory func() any) {
 
-	p.syncPool.New = func() interface{} {
+	p.syncPool.New = func() any {
 		newItem := factory()
 
-		if !p.noCount {
+		if p.enableCount {
 			atomic.AddUint32(&p.count, 1) // p.count++
-			runtime.SetFinalizer(newItem, func(newItem interface{}) {
+			runtime.SetFinalizer(newItem, func(newItem any) {
 				atomic.AddUint32(&p.count, ^uint32(0)) // p.count--
-				// fmt.Printf("Factory Item has been garbage collected. (%d left)\n", p.count)
+				// fmt.Printf("+++Factory Item has been garbage collected. (%d left)\n", p.count)
 			})
 		}
 
-		// fmt.Printf("New Factory Item created (%d in pool)\n", p.count)
+		// fmt.Printf("***New Factory Item created (%d in pool)\n", p.count)
 		return newItem
 	}
 
 	if p.initial != nil {
 		// create initial number of items
-		items := []interface{}{}
+		items := make([]any, 0, *p.initial)
 
 		// create new items
-		for i := 0; i < *p.initial; i++ {
+		for i := uint32(0); i < *p.initial; i++ {
 			items = append(items, p.borrow())
 		}
 		// return new items
@@ -132,10 +137,14 @@ func (p *Pool) SetFactory(factory func() interface{}) {
 	}
 }
 
-func (p *Pool) borrow() interface{} {
+func (p *Pool) borrow() any {
 	if p.semMax != nil {
 		p.semMax.Acquire(context.Background(), 1)
 	}
+	if p.enableCount {
+		atomic.AddUint32(&p.countBorrowedOut, 1) // p.countBorrowedOut++
+	}
+
 	wrap := itemWrapPool.Get().(*ItemWrap)
 	item := p.syncPool.Get()
 
@@ -144,24 +153,26 @@ func (p *Pool) borrow() interface{} {
 	return wrap
 }
 
-func (p *Pool) returnItem(x interface{}) {
+func (p *Pool) returnItem(x any) {
 	wrap := x.(*ItemWrap)
-	wrap.pool = nil
-	if wrap.invalid {
-		wrap.invalid = false
-	} else {
+
+	if !wrap.invalid {
 		p.syncPool.Put(wrap.Item)
 	}
-	wrap.Item = nil
+	wrap.Reset()
+
 	itemWrapPool.Put(wrap)
+	if p.enableCount {
+		atomic.AddUint32(&p.countBorrowedOut, ^uint32(0)) // p.countBorrowedOut--
+	}
 	if p.semMax != nil {
 		p.semMax.Release(1)
 	}
 }
 
 // Borrow obtains an item from the pool.
-// If the Max option is set, then this function
-// will block until an item is returned back into the pool.
+// If the Max option is set, then this function will
+// block until an item is returned back into the pool.
 //
 // After the item is no longer required, you must call
 // Return on the item.
@@ -170,17 +181,32 @@ func (p *Pool) Borrow() *ItemWrap {
 }
 
 // ReturnItem returns an item back to the pool.
-// Usually this function is never called, as the recommended
+// Usually developer's never call this function, as the recommended
 // approach is to call Return on the item.
 func (p *Pool) ReturnItem(x *ItemWrap) {
 	p.returnItem(x)
 }
 
-// Count returns approximately the number of items in the pool (idle and in-use).
+// Count returns approximately the number of items in the pool (idle).
 // If you want an accurate number, call runtime.GC() twice before calling Count (not recommended).
-func (p *Pool) Count() int {
-	if p.noCount {
+//
+// NOTE: Count can exceed both the Initial and Max value.
+func (p *Pool) Count() uint32 {
+	if !p.enableCount {
 		return 0
 	}
-	return int(atomic.LoadUint32(&p.count))
+	c := atomic.LoadUint32(&p.count)
+	b := atomic.LoadUint32(&p.countBorrowedOut)
+	if c > b {
+		return c - b
+	}
+	return 0
+}
+
+// OnLoan returns how many items are in-use.
+func (p *Pool) OnLoan() uint32 {
+	if !p.enableCount {
+		return 0
+	}
+	return atomic.LoadUint32(&p.countBorrowedOut)
 }
