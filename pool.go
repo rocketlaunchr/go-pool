@@ -2,7 +2,6 @@ package pool
 
 import (
 	"context"
-	// "fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -16,7 +15,8 @@ type Options struct {
 	// Initial creates an initial number of ready-to-use items in the pool.
 	Initial uint32
 
-	// Max represents the maximum number of items you can borrow.
+	// Max represents the maximum number of items you can borrow. This prevents
+	// unbounded growth in the pool.
 	Max uint32
 
 	// EnableCount, when set, enables the pool's Count function.
@@ -180,8 +180,8 @@ func (p *Pool) Borrow() *ItemWrap {
 	return p.borrow().(*ItemWrap)
 }
 
-// ReturnItem returns an item back to the pool.
-// Usually developer's never call this function, as the recommended
+// ReturnItem returns an item back to the pool. Usually
+// developer's never call this function, as the recommended
 // approach is to call Return on the item.
 func (p *Pool) ReturnItem(x *ItemWrap) {
 	p.returnItem(x)
