@@ -11,17 +11,20 @@ import (
 
 // Options configures the Pool struct.
 type Options struct {
-
 	// Initial creates an initial number of ready-to-use items in the pool.
 	Initial uint32
 
 	// Max represents the maximum number of items you can borrow. This prevents
 	// unbounded growth in the pool.
+	//
+	// Depending on the timing of Returns and Factory calls, the maximum number of
+	// items in the pool can exceed Max by a small number for a short time.
 	Max uint32
 
 	// EnableCount, when set, enables the pool's Count function.
-	// If you set this AND you need to set your own runtime Finalizer on the item,
-	// wrap your item in another struct, with the Finalizer added to the original item.
+	//
+	// NOTE: If you set this AND you need to set your own runtime Finalizer on the item,
+	// wrap your item in another struct, with the Finalizer added to the inner item.
 	EnableCount bool
 }
 
@@ -52,13 +55,14 @@ type Options struct {
 // free list.
 //
 // A Pool must not be copied after first use.
-type Pool struct {
+type Pool[T any] struct {
 	noCopy noCopy
 
 	initial *uint32 // if nil, then initial items have already been created (or initial option was no set)
 
-	syncPool sync.Pool
-	semMax   *semaphore.Weighted
+	itemWrapPool *sync.Pool
+	syncPool     sync.Pool
+	semMax       *semaphore.Weighted
 
 	enableCount      bool
 	count            uint32 // count keeps track of approximately how many items are in existence (in the pool and in-use).
@@ -67,11 +71,15 @@ type Pool struct {
 
 // New creates a new Pool.
 // opts accepts either an int (representing the max) or an Options struct.
-func New(opts ...any) Pool {
-	if len(opts) == 0 {
-		return Pool{}
+func New[T any](opts ...any) Pool[T] {
+	pool := Pool[T]{
+		itemWrapPool: &sync.Pool{
+			New: func() any { return new(ItemWrap[T]) },
+		},
 	}
-	pool := Pool{}
+	if len(opts) == 0 {
+		return pool
+	}
 	switch o := opts[0].(type) {
 	case int:
 		pool.semMax = semaphore.NewWeighted(int64(o))
@@ -99,12 +107,12 @@ func New(opts ...any) Pool {
 	return pool
 }
 
-// SetFactory specifies a function to generate an item when Borrow is called.
+// SetFactory specifies a function to generate a new item when Borrow is called.
 // It must not be called concurrently with calls to Borrow.
 //
 // NOTE: factory should generally only return pointer types, since a pointer can be put into the return interface
 // value without an allocation.
-func (p *Pool) SetFactory(factory func() any) {
+func (p *Pool[T]) SetFactory(factory func() T) {
 
 	p.syncPool.New = func() any {
 		newItem := factory()
@@ -123,7 +131,7 @@ func (p *Pool) SetFactory(factory func() any) {
 
 	if p.initial != nil {
 		// create initial number of items
-		items := make([]any, 0, *p.initial)
+		items := make([]*ItemWrap[T], 0, *p.initial)
 
 		// create new items
 		for i := uint32(0); i < *p.initial; i++ {
@@ -137,7 +145,7 @@ func (p *Pool) SetFactory(factory func() any) {
 	}
 }
 
-func (p *Pool) borrow() any {
+func (p *Pool[T]) borrow() *ItemWrap[T] {
 	if p.semMax != nil {
 		p.semMax.Acquire(context.Background(), 1)
 	}
@@ -145,23 +153,21 @@ func (p *Pool) borrow() any {
 		atomic.AddUint32(&p.countBorrowedOut, 1) // p.countBorrowedOut++
 	}
 
-	wrap := itemWrapPool.Get().(*ItemWrap)
+	wrap := p.itemWrapPool.Get().(*ItemWrap[T])
 	item := p.syncPool.Get()
 
-	wrap.Item = item
+	wrap.Item = item.(T)
 	wrap.pool = p
 	return wrap
 }
 
-func (p *Pool) returnItem(x any) {
-	wrap := x.(*ItemWrap)
-
+func (p *Pool[T]) returnItem(wrap *ItemWrap[T]) {
 	if !wrap.invalid {
 		p.syncPool.Put(wrap.Item)
 	}
 	wrap.Reset()
 
-	itemWrapPool.Put(wrap)
+	p.itemWrapPool.Put(wrap)
 	if p.enableCount {
 		atomic.AddUint32(&p.countBorrowedOut, ^uint32(0)) // p.countBorrowedOut--
 	}
@@ -176,22 +182,22 @@ func (p *Pool) returnItem(x any) {
 //
 // After the item is no longer required, you must call
 // Return on the item.
-func (p *Pool) Borrow() *ItemWrap {
-	return p.borrow().(*ItemWrap)
+func (p *Pool[T]) Borrow() *ItemWrap[T] {
+	return p.borrow()
 }
 
 // ReturnItem returns an item back to the pool. Usually
 // developer's never call this function, as the recommended
 // approach is to call Return on the item.
-func (p *Pool) ReturnItem(x *ItemWrap) {
+func (p *Pool[T]) ReturnItem(x *ItemWrap[T]) {
 	p.returnItem(x)
 }
 
 // Count returns approximately the number of items in the pool (idle).
 // If you want an accurate number, call runtime.GC() twice before calling Count (not recommended).
 //
-// NOTE: Count can exceed both the Initial and Max value.
-func (p *Pool) Count() uint32 {
+// NOTE: Count can exceed both the Initial and Max value by a small number for a short time.
+func (p *Pool[T]) Count() uint32 {
 	if !p.enableCount {
 		return 0
 	}
@@ -204,7 +210,7 @@ func (p *Pool) Count() uint32 {
 }
 
 // OnLoan returns how many items are in-use.
-func (p *Pool) OnLoan() uint32 {
+func (p *Pool[T]) OnLoan() uint32 {
 	if !p.enableCount {
 		return 0
 	}

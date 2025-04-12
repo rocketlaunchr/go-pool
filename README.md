@@ -9,18 +9,18 @@
 <p align="right">
   <a href="http://godoc.org/github.com/rocketlaunchr/go-pool"><img src="http://godoc.org/github.com/rocketlaunchr/go-pool?status.svg" /></a>
   <a href="https://goreportcard.com/report/github.com/rocketlaunchr/go-pool"><img src="https://goreportcard.com/badge/github.com/rocketlaunchr/go-pool" /></a>
-  <a href="https://gocover.io/github.com/rocketlaunchr/go-pool"><img src="http://gocover.io/_badge/github.com/rocketlaunchr/go-pool" /></a>
 </p>
 
-# A Better sync.Pool  ![](https://img.shields.io/static/v1?label=%E2%9A%A0%EF%B8%8F&message=BETA&labelColor=fbcf11&color=red) 
+# A Generic sync.Pool  ![](https://img.shields.io/static/v1?label=%E2%9C%93&message=Prod%20Ready&labelColor=darkgreen&color=green) 
 
-This package is a **thin** wrapper over the `Pool` provided by the `sync` package. The `Pool` is an essential package to obtain maximum performance by reducing the number of memory allocations.
+This package is a **thin** wrapper over the `Pool` provided by the `sync` package. The `Pool` is an essential package to obtain maximum performance. It does so by reducing memory allocations.
 
 ## Extra Features
 
 - Invalidate an item from the Pool (so it never gets used again)
-- Set a maximum number of items for the Pool
+- Set a maximum number of items for the Pool (Limit pool growth)
 - Returns the number of items in the pool (idle and in-use)
+- **Fully Generic**
 
 ## When should I use a pool?
 
@@ -33,17 +33,19 @@ If you frequently allocate many objects of the same type and you want to save so
 ```go
 import "github.com/rocketlaunchr/go-pool"
 
-pool := pool.New(5) // maximum of 5 items in pool
-pool.SetFactory(func() interface{} {
+type X struct {}
+
+pool := pool.New[*X](5) // maximum of 5 items can be borrowed
+pool.SetFactory(func() *X {
 	return &X{}
 })
 
-item := pool.Borrow()
-defer item.Return()
+borrowed := pool.Borrow()
+defer borrowed.Return()
 
 // Use item here or mark as invalid
-x := item.Item.(*X) // Use item here
-item.MarkAsInvalid()
+x := borrowed.Item // Use Item of type '*X' here
+borrowed.MarkAsInvalid()
 ```
 
 Other useful packages
@@ -59,8 +61,6 @@ Other useful packages
 - [react](https://github.com/rocketlaunchr/react) - Build front end applications using Go
 - [remember-go](https://github.com/rocketlaunchr/remember-go) - Cache slow database queries
 - [testing-go](https://github.com/rocketlaunchr/testing-go) - Testing framework for unit testing
-
-
 
 ### Logo Credits
 
