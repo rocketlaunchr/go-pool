@@ -19,16 +19,15 @@ func TestPool(t *testing.T) {
 		ids[v] = struct{}{}
 	}
 
-	p := pool.New[*X](pool.Options{Max: 1})
 	i := 0
-	p.SetFactory(func() *X {
+	p := pool.New(func() *X {
 		// This function will panic if Max field is not able to restrict growth
 		// of pool and slice goes "index out of range"
 		defer func() {
 			i++
 		}()
 		return &X{randoms[i]}
-	})
+	}, pool.Options{Max: 1})
 
 	for i := 0; i < 1_000_000; i++ {
 		i := i
@@ -37,7 +36,7 @@ func TestPool(t *testing.T) {
 			borrowed := p.Borrow()
 			defer borrowed.Return()
 
-			id := borrowed.Item.ID
+			id := borrowed.Item().ID
 
 			if _, exists := ids[id]; !exists {
 				t.Errorf("Result was incorrect, got: %s, want: %s.", id, strings.Join(randoms, ","))

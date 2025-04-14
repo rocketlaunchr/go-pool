@@ -19,14 +19,15 @@ This package is a **thin** wrapper over the `Pool` provided by the `sync` packag
 
 - Invalidate an item from the Pool (so it never gets used again)
 - Set a maximum number of items for the Pool (Limit pool growth)
-- Returns the number of items in the pool (idle and in-use)
+- Return the number of items in the pool (idle and in-use)
+- Designed for concurrency
 - **Fully Generic**
 
 ## When should I use a pool?
 
-If you frequently allocate many objects of the same type and you want to save some memory allocation and garbage allocation overhead — @jrv
+> If you frequently allocate many objects of the same type and you want to save some memory allocation and garbage allocation overhead — @jrv
 
-[How did I improve latency by 700% using sync.Pool](https://www.akshaydeo.com/blog/2017/12/23/How-did-I-improve-latency-by-700-percent-using-syncPool)
+Read [How did I improve latency by 700% using sync.Pool](https://www.akshaydeo.com/blog/2017/12/23/How-did-I-improve-latency-by-700-percent-using-syncPool)
 
 ## Example
 
@@ -35,16 +36,15 @@ import "github.com/rocketlaunchr/go-pool"
 
 type X struct {}
 
-pool := pool.New[*X](5) // maximum of 5 items can be borrowed
-pool.SetFactory(func() *X {
-	return &X{}
-})
+pool := pool.New(func() *X {
+  return &X{}
+}, 5) // maximum of 5 items can be borrowed at a time
 
 borrowed := pool.Borrow()
 defer borrowed.Return()
 
 // Use item here or mark as invalid
-x := borrowed.Item // Use Item of type '*X' here
+x := borrowed.Item() // Use Item of type: *X
 borrowed.MarkAsInvalid()
 ```
 

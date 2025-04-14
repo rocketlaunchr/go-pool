@@ -14,8 +14,8 @@ type Options struct {
 	// Initial creates an initial number of ready-to-use items in the pool.
 	Initial uint32
 
-	// Max represents the maximum number of items you can borrow. This prevents
-	// unbounded growth in the pool.
+	// Max represents the maximum number of items you can borrow at a time. This 
+	// prevents unbounded growth in the pool.
 	//
 	// Depending on the timing of Returns and Factory calls, the maximum number of
 	// items in the pool can exceed Max by a small number for a short time.
@@ -70,14 +70,20 @@ type Pool[T any] struct {
 }
 
 // New creates a new Pool.
-// opts accepts either an int (representing the max) or an Options struct.
-func New[T any](opts ...any) Pool[T] {
+//
+// factory specifies a function to generate a new item when Borrow is called. opts accepts either an int (representing the max)
+// or an Options struct.
+//
+// NOTE: factory should generally only return pointer types, since a pointer can be put into the return interface
+// value without an allocation.
+func New[T any](factory func() T, opts ...any) Pool[T] {
 	pool := Pool[T]{
 		itemWrapPool: &sync.Pool{
-			New: func() any { return new(ItemWrap[T]) },
+			New: func() any { return new(itemWrap[T]) },
 		},
 	}
 	if len(opts) == 0 {
+		pool.syncPool.New = func() any { return factory() }
 		return pool
 	}
 	switch o := opts[0].(type) {
@@ -85,6 +91,8 @@ func New[T any](opts ...any) Pool[T] {
 		pool.semMax = semaphore.NewWeighted(int64(o))
 	case uint32:
 		pool.semMax = semaphore.NewWeighted(int64(o))
+	case int64:
+		pool.semMax = semaphore.NewWeighted(o)
 	case Options:
 		// max
 		if o.Max != 0 {
@@ -104,48 +112,37 @@ func New[T any](opts ...any) Pool[T] {
 	default:
 		panic("opts must be an int or Options struct")
 	}
-	return pool
-}
 
-// SetFactory specifies a function to generate a new item when Borrow is called.
-// It must not be called concurrently with calls to Borrow.
-//
-// NOTE: factory should generally only return pointer types, since a pointer can be put into the return interface
-// value without an allocation.
-func (p *Pool[T]) SetFactory(factory func() T) {
-
-	p.syncPool.New = func() any {
+	pool.syncPool.New = func() any {
 		newItem := factory()
-
-		if p.enableCount {
-			atomic.AddUint32(&p.count, 1) // p.count++
+		if pool.enableCount {
+			atomic.AddUint32(&pool.count, 1) // pool.count++
 			runtime.SetFinalizer(newItem, func(newItem any) {
-				atomic.AddUint32(&p.count, ^uint32(0)) // p.count--
-				// fmt.Printf("+++Factory Item has been garbage collected. (%d left)\n", p.count)
+				atomic.AddUint32(&pool.count, ^uint32(0)) // pool.count--
 			})
 		}
-
-		// fmt.Printf("***New Factory Item created (%d in pool)\n", p.count)
 		return newItem
 	}
 
-	if p.initial != nil {
+	if pool.initial != nil {
 		// create initial number of items
-		items := make([]*ItemWrap[T], 0, *p.initial)
+		items := make([]*itemWrap[T], 0, *pool.initial)
 
 		// create new items
-		for i := uint32(0); i < *p.initial; i++ {
-			items = append(items, p.borrow())
+		for i := uint32(0); i < *pool.initial; i++ {
+			items = append(items, pool.borrow())
 		}
 		// return new items
 		for j := len(items) - 1; j >= 0; j-- {
-			p.returnItem(items[j])
+			pool.returnItem(items[j])
 		}
-		p.initial = nil
+		pool.initial = nil
 	}
+
+	return pool
 }
 
-func (p *Pool[T]) borrow() *ItemWrap[T] {
+func (p *Pool[T]) borrow() *itemWrap[T] {
 	if p.semMax != nil {
 		p.semMax.Acquire(context.Background(), 1)
 	}
@@ -153,19 +150,19 @@ func (p *Pool[T]) borrow() *ItemWrap[T] {
 		atomic.AddUint32(&p.countBorrowedOut, 1) // p.countBorrowedOut++
 	}
 
-	wrap := p.itemWrapPool.Get().(*ItemWrap[T])
+	wrap := p.itemWrapPool.Get().(*itemWrap[T])
 	item := p.syncPool.Get()
 
-	wrap.Item = item.(T)
+	wrap.item = item.(T)
 	wrap.pool = p
 	return wrap
 }
 
-func (p *Pool[T]) returnItem(wrap *ItemWrap[T]) {
+func (p *Pool[T]) returnItem(wrap *itemWrap[T]) {
 	if !wrap.invalid {
-		p.syncPool.Put(wrap.Item)
+		p.syncPool.Put(wrap.item)
 	}
-	wrap.Reset()
+	wrap.reset()
 
 	p.itemWrapPool.Put(wrap)
 	if p.enableCount {
@@ -182,15 +179,14 @@ func (p *Pool[T]) returnItem(wrap *ItemWrap[T]) {
 //
 // After the item is no longer required, you must call
 // Return on the item.
-func (p *Pool[T]) Borrow() *ItemWrap[T] {
+func (p *Pool[T]) Borrow() ItemWrap[T] {
 	return p.borrow()
 }
 
-// ReturnItem returns an item back to the pool. Usually
-// developer's never call this function, as the recommended
-// approach is to call Return on the item.
-func (p *Pool[T]) ReturnItem(x *ItemWrap[T]) {
-	p.returnItem(x)
+// ReturnItem returns an item back to the pool. However, the
+// recommended approach is to call Return on the ItemWrap.
+func (p *Pool[T]) ReturnItem(x ItemWrap[T]) {
+	p.returnItem(x.(*itemWrap[T]))
 }
 
 // Count returns approximately the number of items in the pool (idle).
