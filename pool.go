@@ -14,7 +14,7 @@ type Options struct {
 	// Initial creates an initial number of ready-to-use items in the pool.
 	Initial uint32
 
-	// Max represents the maximum number of items you can borrow at a time. This 
+	// Max represents the maximum number of items you can borrow at a time. This
 	// prevents unbounded growth in the pool.
 	//
 	// Depending on the timing of Returns and Factory calls, the maximum number of

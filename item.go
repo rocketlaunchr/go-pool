@@ -4,10 +4,12 @@ package pool
 type ItemWrap[T any] interface {
 	// Return returns the item back to the pool.
 	Return()
+	
 	// MarkAsInvalid marks the item as invalid (eg. unusable, unstable or broken) so
 	// that after it gets returned to the pool, it is discarded. It will eventually
 	// get garbage collected.
 	MarkAsInvalid()
+	
 	// Item represents the unwrapped item borrowed from the pool.
 	Item() T
 }
